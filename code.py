@@ -75,7 +75,7 @@ MQTT.set_socket(socket, esp)
 
 # Initialize a new MQTT Client object
 mqtt_client = MQTT.MQTT(
-    broker="de354b0f13d94109b29ef2f1f51d293a.s2.eu.hivemq.cloud",
+    broker=secrets["broker"],
     port=8883,
     username=secrets["mqtt_username"],
     password=secrets["mqtt_password"],
@@ -90,14 +90,14 @@ io.on_disconnect = disconnected
 io.on_subscribe = subscribe
 
 # Set up a callback for the led feed
-io.add_feed_callback("led", on_led_msg)
+io.add_feed_callback("klaus/led", on_led_msg)
 
 # Connect to Adafruit IO
 print("Connecting to MQTT Broker...")
 io.connect()
 
 # Subscribe to all messages on the led feed
-io.subscribe("led")
+io.subscribe("klaus/led")
 
 prv_refresh_time = 0.0
 while True:
@@ -119,6 +119,6 @@ while True:
         print("CPU temperature is %s degrees C" % cpu_temp)
         # publish it to io
         print("Publishing %s to temperature feed..." % cpu_temp)
-        io.publish("temperature", cpu_temp)
+        io.publish("klaus/temperature", cpu_temp)
         print("Published!")
         prv_refresh_time = time.monotonic()
