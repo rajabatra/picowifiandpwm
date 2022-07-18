@@ -1,9 +1,18 @@
 # SPDX-FileCopyrightText: Brent Rubell for Adafruit Industries
 # SPDX-License-Identifier: MIT
+#PWM for servo, LED and LED strip added: Raja Batra
 
 import time
 from microcontroller import cpu
 import board
+##
+import time
+import board
+import pwmio
+from adafruit_motor import servo
+import neopixel
+##
+
 import busio
 from digitalio import DigitalInOut
 from adafruit_esp32spi import adafruit_esp32spi
@@ -11,6 +20,31 @@ from adafruit_esp32spi import adafruit_esp32spi_wifimanager
 import adafruit_esp32spi.adafruit_esp32spi_socket as socket
 import adafruit_minimqtt.adafruit_minimqtt as MQTT
 from adafruit_io.adafruit_io import IO_MQTT
+
+## servo setup
+# create a PWMOut object on Pin A2.
+pwm = pwmio.PWMOut(board.GP0, frequency=100)
+
+# Create a servo object, my_servo.
+my_servo = servo.ContinuousServo(pwm)
+
+# ##
+# LED setup 
+
+yellowled = pwmio.PWMOut(board.GP28, frequency=200, duty_cycle=0)
+dc=1
+
+## led strip setup
+# Update this to match the number of NeoPixel LEDs connected to your board.
+num_pixels = 8
+
+pixels = neopixel.NeoPixel(board.GP1, num_pixels)
+pixels.brightness = 0.5
+
+
+
+
+
 
 ### WiFi ###
 
@@ -53,7 +87,16 @@ def disconnected(client):
     # Disconnected function will be called when the client disconnects.
     print("Disconnected from MQTT Broker!")
 
+##function to change PWM of light
+def setPWM(client, topic, message):
+    # Method called whenever user/feeds/yellowled has a new value
+    print("New message on topic {0}: {1} ".format(topic, message))
+    global dc
+    dc = int(message)
+   
+    
 
+##function to turn on LED
 def on_led_msg(client, topic, message):
     # Method called whenever user/feeds/led has a new value
     print("New message on topic {0}: {1} ".format(topic, message))
@@ -63,6 +106,7 @@ def on_led_msg(client, topic, message):
         led_pin.value = False
     else:
         print("Unexpected message on LED feed.")
+
 
 
 # Connect to WiFi
@@ -75,7 +119,7 @@ MQTT.set_socket(socket, esp)
 
 # Initialize a new MQTT Client object
 mqtt_client = MQTT.MQTT(
-    broker=secrets["broker"],
+    broker="mqtt.iot.wonderware.com",
     port=8883,
     username=secrets["mqtt_username"],
     password=secrets["mqtt_password"],
@@ -89,28 +133,69 @@ io.on_connect = connected
 io.on_disconnect = disconnected
 io.on_subscribe = subscribe
 
-# Set up a callback for the led feed
-io.add_feed_callback("klaus/led", on_led_msg)
+# Set up a callback for the board led feed
+io.add_feed_callback("raja/led", on_led_msg)
+
+# Set up a callback for the yellow led feed
+io.add_feed_callback("raja/setpwm", setPWM)
 
 # Connect to Adafruit IO
 print("Connecting to MQTT Broker...")
 io.connect()
 
-# Subscribe to all messages on the led feed
-io.subscribe("klaus/led")
+# Subscribe to all messages on the board led feed
+io.subscribe("raja/led")
+
+# Subscribe to all messages on the yellow led feed
+io.subscribe("raja/setpwm")
 
 prv_refresh_time = 0.0
+
+
 while True:
+
+
+
     # Poll for incoming messages
     try:
         io.loop()
+   
+
     except (ValueError, RuntimeError) as e:
         print("Failed to get data, retrying\n", e)
         wifi.reset()
         wifi.connect()
         io.reconnect()
         continue
-    # Send a new temperature reading to IO every 30 seconds
+  
+        
+    
+    for i in range(100):
+        # PWM up and down
+        
+        if i < dc:
+            
+            #led up
+            yellowled.duty_cycle = int(i * 65535 / 100)  # Up
+            a = int(i * 65535 / 100)
+            print("on")
+
+            #led strip first color
+            pixels.fill((255, 0, 0))
+
+            #servo rotation
+            my_servo.throttle = 1.0
+        elif((a - int((i-dc) * 65535) / 100)>0):
+            #led down
+            yellowled.duty_cycle = a - int((i-dc) * 65535 / 100)# Down
+            #led second color
+            pixels.fill((0, 255, 255))
+            #servo rotation
+            my_servo.throttle = -1.0
+      
+        
+
+  #  Send a new temperature reading to IO every 30 seconds
     if (time.monotonic() - prv_refresh_time) > 30:
         # take the cpu's temperature
         cpu_temp = cpu.temperature
@@ -119,6 +204,7 @@ while True:
         print("CPU temperature is %s degrees C" % cpu_temp)
         # publish it to io
         print("Publishing %s to temperature feed..." % cpu_temp)
-        io.publish("klaus/temperature", cpu_temp)
+        io.publish("raja/temperature", cpu_temp)
         print("Published!")
+        prv_refresh_time = time.monotonic()
         prv_refresh_time = time.monotonic()
