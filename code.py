@@ -119,7 +119,7 @@ MQTT.set_socket(socket, esp)
 
 # Initialize a new MQTT Client object
 mqtt_client = MQTT.MQTT(
-    broker="mqtt.iot.wonderware.com",
+    broker="[broker address]",
     port=8883,
     username=secrets["mqtt_username"],
     password=secrets["mqtt_password"],
