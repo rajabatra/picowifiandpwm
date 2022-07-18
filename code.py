@@ -9,7 +9,7 @@ import board
 import time
 import board
 import pwmio
-from adafruit_motor import servo
+import servo
 import neopixel
 ##
 
